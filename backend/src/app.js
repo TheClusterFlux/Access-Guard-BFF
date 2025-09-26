@@ -66,12 +66,20 @@ app.use(express.urlencoded({ extended: true }));
 const getMongoUri = () => {
   const mongoPassword = process.env.MONGO_PASSWORD;
   const isLocal = process.env.IS_LOCAL === 'true';
+  const existingMongoUri = process.env.MONGODB_URI;
   
   logger.info(`Environment check: NODE_ENV=${process.env.NODE_ENV}, IS_LOCAL=${process.env.IS_LOCAL}`);
   logger.info(`MONGO_PASSWORD exists: ${!!mongoPassword}`);
+  logger.info(`MONGODB_URI exists: ${!!existingMongoUri}`);
+  
+  // For local development, use existing MONGODB_URI if available
+  if (!mongoPassword && existingMongoUri) {
+    logger.info('Using existing MONGODB_URI for local development');
+    return existingMongoUri;
+  }
   
   if (!mongoPassword) {
-    logger.error('MONGO_PASSWORD environment variable is required');
+    logger.error('MONGO_PASSWORD environment variable is required for production');
     logger.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('MONGO')));
     process.exit(1);
   }
@@ -84,14 +92,26 @@ const getMongoUri = () => {
   return uri;
 };
 
-mongoose.connect(getMongoUri())
-.then(() => {
-  logger.info(`Connected to MongoDB (${process.env.NODE_ENV || 'development'} environment)`);
-})
-.catch((error) => {
-  logger.error('MongoDB connection error:', error);
+console.log('About to connect to MongoDB...');
+
+try {
+  const mongoUri = getMongoUri();
+  console.log('MongoDB URI obtained, connecting...');
+  
+  mongoose.connect(mongoUri)
+  .then(() => {
+    logger.info(`Connected to MongoDB (${process.env.NODE_ENV || 'development'} environment)`);
+    console.log('MongoDB connection successful!');
+  })
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    logger.error('MongoDB connection error:', error);
+    process.exit(1);
+  });
+} catch (error) {
+  console.error('Error in MongoDB connection setup:', error);
   process.exit(1);
-});
+}
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -157,9 +177,23 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
+console.log(`Starting server on port ${PORT}...`);
+
 server.listen(PORT, () => {
+  console.log(`Server started successfully on port ${PORT}`);
   logger.info(`AccessGuard server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Add error handler for uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 // Graceful shutdown
