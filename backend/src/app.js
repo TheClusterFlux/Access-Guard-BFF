@@ -1,22 +1,43 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const http = require('http');
-const socketIo = require('socket.io');
-require('dotenv').config();
+console.log('Starting AccessGuard backend...');
 
-const logger = require('./utils/logger');
-const errorHandler = require('./middleware/errorHandler');
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const residentRoutes = require('./routes/residents');
-const guestCodeRoutes = require('./routes/guestCodes');
-const guestVisitRoutes = require('./routes/guestVisits');
-const deliveryRoutes = require('./routes/deliveries');
-const accessLogRoutes = require('./routes/accessLogs');
-const notificationRoutes = require('./routes/notifications');
+let express, mongoose, cors, helmet, rateLimit, http, socketIo;
+let logger, errorHandler, authRoutes, userRoutes, residentRoutes, guestCodeRoutes, guestVisitRoutes, deliveryRoutes, accessLogRoutes, notificationRoutes;
+
+try {
+  express = require('express');
+  mongoose = require('mongoose');
+  cors = require('cors');
+  helmet = require('helmet');
+  rateLimit = require('express-rate-limit');
+  http = require('http');
+  socketIo = require('socket.io');
+  require('dotenv').config();
+  
+  console.log('Core modules loaded successfully');
+} catch (error) {
+  console.error('Error loading core modules:', error);
+  console.error('Stack trace:', error.stack);
+  process.exit(1);
+}
+
+try {
+  logger = require('./utils/logger');
+  errorHandler = require('./middleware/errorHandler');
+  authRoutes = require('./routes/auth');
+  userRoutes = require('./routes/users');
+  residentRoutes = require('./routes/residents');
+  guestCodeRoutes = require('./routes/guestCodes');
+  guestVisitRoutes = require('./routes/guestVisits');
+  deliveryRoutes = require('./routes/deliveries');
+  accessLogRoutes = require('./routes/accessLogs');
+  notificationRoutes = require('./routes/notifications');
+  
+  console.log('Application modules loaded successfully');
+} catch (error) {
+  console.error('Error loading application modules:', error);
+  console.error('Stack trace:', error.stack);
+  process.exit(1);
+}
 
 const app = express();
 const server = http.createServer(app);
