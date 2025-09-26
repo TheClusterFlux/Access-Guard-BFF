@@ -55,10 +55,7 @@ const getMongoUri = () => {
   }
 };
 
-mongoose.connect(getMongoUri(), {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect(getMongoUri())
 .then(() => {
   logger.info(`Connected to MongoDB (${process.env.NODE_ENV || 'development'} environment)`);
 })

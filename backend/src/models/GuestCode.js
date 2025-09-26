@@ -5,7 +5,6 @@ const guestCodeSchema = new mongoose.Schema({
   code: {
     type: String,
     required: [true, 'Code is required'],
-    unique: true,
     trim: true
   },
   codeType: {
