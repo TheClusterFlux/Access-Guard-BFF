@@ -46,13 +46,21 @@ const getMongoUri = () => {
   const mongoPassword = process.env.MONGO_PASSWORD;
   const isLocal = process.env.IS_LOCAL === 'true';
   
-  if (isLocal) {
-    // Local development MongoDB configuration
-    return `mongodb://root:${mongoPassword}@localhost:27016/accessguard`;
-  } else {
-    // Production MongoDB configuration (Kubernetes)
-    return `mongodb://root:${mongoPassword}@mongodb.default.svc.cluster.local:27017/accessguard`;
+  logger.info(`Environment check: NODE_ENV=${process.env.NODE_ENV}, IS_LOCAL=${process.env.IS_LOCAL}`);
+  logger.info(`MONGO_PASSWORD exists: ${!!mongoPassword}`);
+  
+  if (!mongoPassword) {
+    logger.error('MONGO_PASSWORD environment variable is required');
+    logger.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('MONGO')));
+    process.exit(1);
   }
+  
+  const uri = isLocal 
+    ? `mongodb://root:${mongoPassword}@localhost:27016/accessguard`
+    : `mongodb://root:${mongoPassword}@mongodb:27017/accessguard`;
+    
+  logger.info(`MongoDB URI (password hidden): ${uri.replace(mongoPassword, '***')}`);
+  return uri;
 };
 
 mongoose.connect(getMongoUri())
