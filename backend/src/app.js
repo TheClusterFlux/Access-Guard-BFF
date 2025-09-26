@@ -85,8 +85,8 @@ const getMongoUri = () => {
   }
   
   const uri = isLocal 
-    ? `mongodb://root:${mongoPassword}@localhost:27016/accessguard`
-    : `mongodb://root:${mongoPassword}@mongodb:27017/accessguard`;
+    ? `mongodb://root:${mongoPassword}@localhost:27016`
+    : `mongodb://root:${mongoPassword}@mongodb.default.svc.cluster.local:27017`;
     
   logger.info(`MongoDB URI (password hidden): ${uri.replace(mongoPassword, '***')}`);
   return uri;
@@ -98,7 +98,9 @@ try {
   const mongoUri = getMongoUri();
   console.log('MongoDB URI obtained, connecting...');
   
-  mongoose.connect(mongoUri)
+  mongoose.connect(mongoUri, { 
+    dbName: 'accessguard' 
+  })
   .then(() => {
     logger.info(`Connected to MongoDB (${process.env.NODE_ENV || 'development'} environment)`);
     console.log('MongoDB connection successful!');
