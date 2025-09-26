@@ -1,0 +1,158 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const http = require('http');
+const socketIo = require('socket.io');
+require('dotenv').config();
+
+const logger = require('./utils/logger');
+const errorHandler = require('./middleware/errorHandler');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const residentRoutes = require('./routes/residents');
+const guestCodeRoutes = require('./routes/guestCodes');
+const guestVisitRoutes = require('./routes/guestVisits');
+const deliveryRoutes = require('./routes/deliveries');
+const accessLogRoutes = require('./routes/accessLogs');
+const notificationRoutes = require('./routes/notifications');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(limiter);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Database connection with environment-based configuration
+const getMongoUri = () => {
+  const mongoPassword = process.env.MONGO_PASSWORD;
+  const isLocal = process.env.IS_LOCAL === 'true';
+  
+  if (isLocal) {
+    // Local development MongoDB configuration
+    return `mongodb://root:${mongoPassword}@localhost:27016/accessguard`;
+  } else {
+    // Production MongoDB configuration (Kubernetes)
+    return `mongodb://root:${mongoPassword}@mongodb.default.svc.cluster.local:27017/accessguard`;
+  }
+};
+
+mongoose.connect(getMongoUri(), {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  logger.info(`Connected to MongoDB (${process.env.NODE_ENV || 'development'} environment)`);
+})
+.catch((error) => {
+  logger.error('MongoDB connection error:', error);
+  process.exit(1);
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  logger.info('Client connected:', socket.id);
+
+  socket.on('join-resident-room', (residentId) => {
+    socket.join(`resident-${residentId}`);
+    logger.info(`Client ${socket.id} joined resident room: ${residentId}`);
+  });
+
+  socket.on('join-security-room', () => {
+    socket.join('security-room');
+    logger.info(`Client ${socket.id} joined security room`);
+  });
+
+  socket.on('disconnect', () => {
+    logger.info('Client disconnected:', socket.id);
+  });
+});
+
+// Make io available to routes
+app.set('io', io);
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/residents', residentRoutes);
+app.use('/api/guest-codes', guestCodeRoutes);
+app.use('/api/guest-visits', guestVisitRoutes);
+app.use('/api/deliveries', deliveryRoutes);
+app.use('/api/access-logs', accessLogRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'AccessGuard API',
+    version: '1.0.0',
+    status: 'running'
+  });
+});
+
+// Error handling middleware
+app.use(errorHandler);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+  logger.info(`AccessGuard server running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    logger.info('Process terminated');
+    mongoose.connection.close();
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    logger.info('Process terminated');
+    mongoose.connection.close();
+    process.exit(0);
+  });
+});
+
+module.exports = app; 

@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: access-guard-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: access-guard-backend
+  template:
+    metadata:
+      labels:
+        app: access-guard-backend
+    spec:
+      containers:
+        - name: access-guard-backend
+          image: docker.io/keanuwatts/theclusterflux:Access-Guard-BFF
+          imagePullPolicy: Always
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb
+                  key: mongodb-root-password
+            - name: IS_LOCAL
+              value: "false"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: accessguard-secrets
+                  key: jwt-secret
+            - name: FRONTEND_URL
+              value: "https://accessguard-frontend.theclusterflux.com"
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: dockerhub-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: access-guard-backend
+spec:
+  selector:
+    app: access-guard-backend
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: access-guard-backend
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - accessguard-backend.theclusterflux.com
+    secretName: theclusterflux
+  rules:
+  - host: accessguard-backend.theclusterflux.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: access-guard-backend
+            port:
+              number: 8080
