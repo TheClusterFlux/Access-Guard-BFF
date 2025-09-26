@@ -19,7 +19,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: accessguard-backend
     restart: unless-stopped
@@ -40,7 +40,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: .
       dockerfile: Dockerfile
     container_name: accessguard-frontend
     restart: unless-stopped
